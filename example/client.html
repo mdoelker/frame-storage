@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+<body>
+
+<output id="output"></output>
+<script src="../frame-storage.min.js"></script>
+<script>
+    var origin = location.protocol + '//' + location.host;
+    var channelUrl = location.pathname.replace('test.html', 'channel.html') + '#' + encodeURIComponent(origin);
+    var storage = new FrameStorage(channelUrl);
+
+    test(storage, 'Buffered');
+    setTimeout(test.bind(null, storage, 'Unbuffered'), 1000);
+
+    function test(storage, prefix) {
+        var randomNumber = String(Math.random());
+
+        storage.setItem("test", randomNumber);
+        storage.getItem("test", function (err, value) {
+            if (randomNumber === value) {
+                println("[" + prefix + "] Success");
+            } else {
+                println("[" + prefix + "] Value mismatch: " + randomNumber + " " + value);
+            }
+        });
+    }
+
+    function println(message) {
+        document.getElementById("output").innerHTML += message + '<br>';
+    }
+</script>
+
+</body>
+</html>

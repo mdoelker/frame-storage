@@ -1,0 +1,11 @@
+<script src="../frame-storage.min.js"></script>
+<script>
+    var origin = decodeURIComponent(location.hash.substr(1));
+
+    // Allow all subdomains of your-domain.com as target origin.
+    if (/\.your-domain\.com$/i.test(origin)) {
+        FrameStorage.initChannel(origin);
+    } else {
+        console.error('FrameStorage: Origin not allowed');
+    }
+</script>

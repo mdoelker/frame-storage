@@ -1,0 +1,23 @@
+{
+  "name": "frame-storage",
+  "main": "frame-storage.js",
+  "version": "1.0.0",
+  "authors": [
+    "Malte Dölker <mdoelker@me.com>"
+  ],
+  "description": "Allows access to the localStorage of another hostname via iFrame messaging.",
+  "moduleType": [
+    "amd",
+    "globals",
+    "node"
+  ],
+  "keywords": [
+    "localStorage",
+    "iframe"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules"
+  ]
+}
