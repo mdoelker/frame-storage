@@ -33,7 +33,7 @@
 
         var buffer = [];
         var targetWindow = null;
-        var boundMessageEventHandler, boundSave, boundLoad;
+        var boundMessageEventHandler, boundSave, boundLoad, boundEmpty;
 
         var origin = location.protocol + '//' + location.host;
         var originMatches = channelUrl.match(/^(https?:\/\/[a-z0-9-.:@]+)\/?/i) || [null, origin];
@@ -49,6 +49,7 @@
                 boundMessageEventHandler = handleMessageEvent.bind(null, targetWindow);
                 boundSave = save.bind(null, targetWindow, channelOrigin);
                 boundLoad = load.bind(null, targetWindow, channelOrigin);
+                boundEmpty = empty.bind(null, targetWindow, channelOrigin);
                 window.addEventListener('message', boundMessageEventHandler, false);
 
                 // Empty buffer
@@ -81,6 +82,13 @@
                     boundLoad.apply(null, arguments);
                 } else {
                     buffer.push(['load', arguments]);
+                }
+            },
+            clear: function () {
+                if (boundEmpty) {
+                    boundEmpty.apply(null, arguments);
+                } else {
+                    buffer.push(['empty', arguments]);
                 }
             },
             destroy: function () {
@@ -154,6 +162,15 @@
                     }
                     break;
 
+                case 'clear':
+                    try {
+                        localStorage.clear();
+                        sendSuccess();
+                    } catch (e) {
+                        sendError(e);
+                    }
+                    break;
+
                 default:
                     console.error('Unknown action');
                     return;
@@ -182,7 +199,7 @@
                     break;
 
                 default:
-                    console.error("Unknown action");
+                    console.error('Unknown action');
             }
 
             delete FrameStorage._callbacks[message.ref];
@@ -205,7 +222,7 @@
         }
 
         sendMessage(targetWindow, {
-            action: "setItem",
+            action: 'setItem',
             ref: ref,
             key: key,
             value: value
@@ -229,9 +246,30 @@
         }
 
         sendMessage(targetWindow, {
-            action: "getItem",
+            action: 'getItem',
             ref: ref,
             key: key
+        }, origin);
+    }
+
+    /**
+     * Communicates with channel to clear all keys.
+     * @param {Window} targetWindow
+     * @param {String} origin
+     * @param {Function} cb
+     */
+    function empty(targetWindow, origin, cb) {
+        var ref = makeGuid();
+
+        if (cb) {
+            FrameStorage._callbacks[ref] = cb;
+        } else {
+            console.warn('FrameStorage.clear: Missing callback function');
+        }
+
+        sendMessage(targetWindow, {
+            action: 'clear',
+            ref: ref
         }, origin);
     }
 
