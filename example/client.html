@@ -6,7 +6,7 @@
 <script src="../frame-storage.min.js"></script>
 <script>
     var origin = location.protocol + '//' + location.host;
-    var channelUrl = location.pathname.replace('test.html', 'channel.html') + '#' + encodeURIComponent(origin);
+    var channelUrl = location.pathname.replace('client.html', 'channel.html') + '#' + encodeURIComponent(origin);
     var storage = new FrameStorage(channelUrl);
 
     test(storage, 'Buffered');
