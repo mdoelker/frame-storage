@@ -21,7 +21,7 @@
 
     /**
      * Frame Storage
-     * @param {String} channelUrl
+     * @param {string} channelUrl
      * @returns {{setItem: Function, getItem: Function, destroy: Function}}
      * @constructor
      */
@@ -33,7 +33,7 @@
 
         var buffer = [];
         var targetWindow = null;
-        var boundMessageEventHandler, boundSave, boundLoad, boundEmpty;
+        var boundMessageEventHandler, boundSave, boundLoad, boundEmpty, boundCount, boundKey;
 
         var origin = location.protocol + '//' + location.host;
         var originMatches = channelUrl.match(/^(https?:\/\/[a-z0-9-.:@]+)\/?/i) || [null, origin];
@@ -50,6 +50,8 @@
                 boundSave = save.bind(null, targetWindow, channelOrigin);
                 boundLoad = load.bind(null, targetWindow, channelOrigin);
                 boundEmpty = empty.bind(null, targetWindow, channelOrigin);
+                boundCount = count.bind(null, targetWindow, channelOrigin);
+                boundKey = key.bind(null, targetWindow, channelOrigin);
                 window.addEventListener('message', boundMessageEventHandler, false);
 
                 // Empty buffer
@@ -62,6 +64,18 @@
                         case 'load':
                             boundLoad.apply(null, item[1]);
                             break;
+
+                        case 'empty':
+                            boundEmpty.apply(null, item[1]);
+                            break;
+
+                        case 'count':
+                            boundCount.apply(null, item[1]);
+                            break;
+
+                        case 'key':
+                            boundKey.apply(null, item[1]);
+                            break;
                     }
                 });
 
@@ -70,13 +84,6 @@
         });
 
         return {
-            setItem: function () {
-                if (boundSave) {
-                    boundSave.apply(null, arguments);
-                } else {
-                    buffer.push(['save', arguments]);
-                }
-            },
             getItem: function () {
                 if (boundLoad) {
                     boundLoad.apply(null, arguments);
@@ -84,11 +91,32 @@
                     buffer.push(['load', arguments]);
                 }
             },
+            setItem: function () {
+                if (boundSave) {
+                    boundSave.apply(null, arguments);
+                } else {
+                    buffer.push(['save', arguments]);
+                }
+            },
             clear: function () {
                 if (boundEmpty) {
                     boundEmpty.apply(null, arguments);
                 } else {
                     buffer.push(['empty', arguments]);
+                }
+            },
+            length: function () {
+                if (boundCount) {
+                    boundCount.apply(null, arguments);
+                } else {
+                    buffer.push(['count', arguments]);
+                }
+            },
+            key: function () {
+                if (boundKey) {
+                    boundKey.apply(null, arguments);
+                } else {
+                    buffer.push(['key', arguments]);
                 }
             },
             destroy: function () {
@@ -112,7 +140,7 @@
     /**
      * Sets up the server part of communication. Has to be called inside
      * of the frame.
-     * @param {String} [clientOrigin]
+     * @param {string} [clientOrigin]
      */
     function initChannel(clientOrigin) {
         if (clientOrigin == null) {
@@ -144,21 +172,30 @@
             };
 
             switch (message.action) {
-                case 'setItem':
-                    try {
-                        localStorage.setItem(message.key, message.value);
-                        sendSuccess(null);
-                    } catch (e) {
-                        sendError(e);
-                    }
-                    break;
-
                 case 'getItem':
                     try {
                         var value = localStorage.getItem(message.key);
                         sendSuccess(value);
-                    } catch (e) {
-                        sendError(e);
+                    } catch (err) {
+                        sendError(err);
+                    }
+                    break;
+
+                case 'setItem':
+                    try {
+                        localStorage.setItem(message.key, message.value);
+                        sendSuccess(null);
+                    } catch (err) {
+                        sendError(err);
+                    }
+                    break;
+
+                case 'removeItem':
+                    try {
+                        localStorage.removeItem(message.key);
+                        sendSuccess(null);
+                    } catch (err) {
+                        sendError(err);
                     }
                     break;
 
@@ -166,8 +203,25 @@
                     try {
                         localStorage.clear();
                         sendSuccess();
-                    } catch (e) {
-                        sendError(e);
+                    } catch (err) {
+                        sendError(err);
+                    }
+                    break;
+
+                case 'length':
+                    try {
+                        sendSuccess(localStorage.length);
+                    } catch (err) {
+                        sendError(err);
+                    }
+                    break;
+
+                case 'key':
+                    try {
+                        var name = localStorage.key(message.value);
+                        sendSuccess(name);
+                    } catch (err) {
+                        sendError(err);
                     }
                     break;
 
@@ -209,10 +263,10 @@
     /**
      * Communicates with channel to either set or get a value.
      * @param {Window} targetWindow
-     * @param {String} origin
-     * @param {String} key
-     * @param {Function} [cb]
+     * @param {string} origin
+     * @param {string} key
      * @param {*} value
+     * @param {Function} [cb]
      */
     function save(targetWindow, origin, key, value, cb) {
         var ref = makeGuid();
@@ -232,8 +286,8 @@
     /**
      * Communicates with channel to load a value.
      * @param {Window} targetWindow
-     * @param {String} origin
-     * @param {String} key
+     * @param {string} origin
+     * @param {string} key
      * @param {Function} cb
      */
     function load(targetWindow, origin, key, cb) {
@@ -255,7 +309,7 @@
     /**
      * Communicates with channel to clear all keys.
      * @param {Window} targetWindow
-     * @param {String} origin
+     * @param {string} origin
      * @param {Function} cb
      */
     function empty(targetWindow, origin, cb) {
@@ -274,10 +328,52 @@
     }
 
     /**
+     * Communicates with channel to count number of keys.
+     * @param {Window} targetWindow
+     * @param {string} origin
+     * @param {Function} cb
+     */
+    function count(targetWindow, origin, cb) {
+        var ref = makeGuid();
+
+        if (cb) {
+            FrameStorage._callbacks[ref] = cb;
+        } else {
+            console.warn('FrameStorage.length: Missing callback function');
+        }
+
+        sendMessage(targetWindow, {
+            action: 'length',
+            ref: ref
+        }, origin);
+    }
+
+    /**
+     * Communicates with channel to get the key name for the n-th entry.
+     * @param {Window} targetWindow
+     * @param {string} origin
+     * @param {number} value
+     * @param {Function} [cb]
+     */
+    function key(targetWindow, origin, value, cb) {
+        var ref = makeGuid();
+
+        if (cb) {
+            FrameStorage._callbacks[ref] = cb;
+        }
+
+        sendMessage(targetWindow, {
+            action: 'key',
+            ref: ref,
+            value: value
+        }, origin);
+    }
+
+    /**
      * Send message to channel.
      * @param {Window} targetWindow
      * @param {*} message
-     * @param {String} [origin]
+     * @param {string} [origin]
      */
     function sendMessage(targetWindow, message, origin) {
         targetWindow.postMessage(JSON.stringify(message), origin);
@@ -285,7 +381,7 @@
 
     /**
      * Generates a weak random ID.
-     * @return {String}
+     * @return {string}
      */
     function makeGuid() {
         return 'c' + (Math.random() * (1 << 30)).toString(16).replace('.', '');
