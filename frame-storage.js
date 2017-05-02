@@ -22,7 +22,7 @@
     /**
      * Frame Storage
      * @param {string} channelUrl
-     * @returns {{setItem: Function, getItem: Function, destroy: Function}}
+     * @returns {object}
      * @constructor
      */
     function FrameStorage(channelUrl) {
@@ -33,7 +33,7 @@
 
         var buffer = [];
         var targetWindow = null;
-        var boundMessageEventHandler, boundSave, boundLoad, boundEmpty, boundCount, boundKey;
+        var boundMessageEventHandler, boundSave, boundLoad, boundRemove, boundEmpty, boundCount, boundKey;
 
         var origin = location.protocol + '//' + location.host;
         var originMatches = channelUrl.match(/^(https?:\/\/[a-z0-9-.:@]+)\/?/i) || [null, origin];
@@ -49,6 +49,7 @@
                 boundMessageEventHandler = handleMessageEvent.bind(null, targetWindow);
                 boundSave = save.bind(null, targetWindow, channelOrigin);
                 boundLoad = load.bind(null, targetWindow, channelOrigin);
+                boundRemove = remove.bind(null, targetWindow, channelOrigin);
                 boundEmpty = empty.bind(null, targetWindow, channelOrigin);
                 boundCount = count.bind(null, targetWindow, channelOrigin);
                 boundKey = key.bind(null, targetWindow, channelOrigin);
@@ -96,6 +97,13 @@
                     boundSave.apply(null, arguments);
                 } else {
                     buffer.push(['save', arguments]);
+                }
+            },
+            removeItem: function () {
+                if (boundRemove) {
+                    boundRemove.apply(null, arguments);
+                } else {
+                    buffer.push(['remove', arguments]);
                 }
             },
             clear: function () {
@@ -301,6 +309,27 @@
 
         sendMessage(targetWindow, {
             action: 'getItem',
+            ref: ref,
+            key: key
+        }, origin);
+    }
+
+    /**
+     * Communcates with channel to remove a key.
+     * @param {Window} targetWindow
+     * @param {string} origin
+     * @param {string} key
+     * @param {Function} cb
+     */
+    function remove(targetWindow, origin, key, cb) {
+        var ref = makeGuid();
+
+        if (cb) {
+            FrameStorage._callbacks[ref] = cb;
+        }
+
+        sendMessage(targetWindow, {
+            action: 'removeItem',
             ref: ref,
             key: key
         }, origin);
